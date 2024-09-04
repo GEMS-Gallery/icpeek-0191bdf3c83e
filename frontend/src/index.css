@@ -34,3 +34,7 @@ body {
 .price {
   @apply text-lg font-semibold text-green-600 mt-4;
 }
+
+.error-message {
+  @apply text-red-600 text-center mt-4;
+}

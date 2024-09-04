@@ -15,6 +15,7 @@ type PoolData = {
 const App: React.FC = () => {
   const [poolData, setPoolData] = useState<PoolData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchICPUSDCPool = async () => {
     const query = `
@@ -34,24 +35,30 @@ const App: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify({ query }),
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
 
       const data = await response.json();
+      if (data.errors) {
+        throw new Error(data.errors[0].message);
+      }
       return data.data.getPool;
     } catch (error) {
       console.error('Error fetching ICP/USDC pool data:', error);
-      return null;
+      throw error;
     }
   };
 
   const updatePoolData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const fetchedPoolData = await fetchICPUSDCPool();
       if (fetchedPoolData) {
@@ -59,7 +66,7 @@ const App: React.FC = () => {
         await backend.updatePoolData(fetchedPoolData);
       }
     } catch (error) {
-      console.error('Error updating pool data:', error);
+      setError(error instanceof Error ? error.message : 'An unknown error occurred');
     }
     setLoading(false);
   };
@@ -81,6 +88,7 @@ const App: React.FC = () => {
     <div className="container">
       <h1 className="header">ICP/USDC Liquidity Pool</h1>
       {loading && <p className="text-center">Loading pool data...</p>}
+      {error && <p className="error-message">Error: {error}</p>}
       {poolData && (
         <div className="pool-data">
           <div className="pool-item">
