@@ -1,8 +1,10 @@
+import Result "mo:base/Result";
 import Text "mo:base/Text";
 
 import Debug "mo:base/Debug";
 import Time "mo:base/Time";
 import Float "mo:base/Float";
+import Error "mo:base/Error";
 
 actor {
   type PoolData = {
@@ -23,19 +25,26 @@ actor {
     kLast = 0;
   };
 
-  public func updatePoolData(poolData: PoolData) : async () {
-    currentPoolData := poolData;
-    Debug.print("Pool data updated");
+  public func updatePoolData(poolData: PoolData) : async Result.Result<(), Text> {
+    try {
+      currentPoolData := poolData;
+      Debug.print("Pool data updated successfully");
+      #ok()
+    } catch (e) {
+      Debug.print("Error updating pool data: " # Error.message(e));
+      #err("Failed to update pool data")
+    }
   };
 
-  public query func getPoolData() : async PoolData {
-    currentPoolData
+  public query func getPoolData() : async Result.Result<PoolData, Text> {
+    #ok(currentPoolData)
   };
 
-  public query func getCurrentPrice() : async Float {
+  public query func getCurrentPrice() : async Result.Result<Float, Text> {
     if (currentPoolData.reserve0 == 0) {
-      return 0;
-    };
-    currentPoolData.reserve1 / currentPoolData.reserve0
+      #err("Invalid reserve values")
+    } else {
+      #ok(currentPoolData.reserve1 / currentPoolData.reserve0)
+    }
   };
 }

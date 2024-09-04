@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { backend } from 'declarations/backend';
 
 const IC_DEX_URL = 'https://5sfsu-ciaaa-aaaad-qamka-cai.raw.ic0.app';
@@ -17,7 +17,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchICPUSDCPool = async () => {
+  const fetchICPUSDCPool = useCallback(async () => {
     const query = `
     query {
       getPool(tokenA: "ryjl3-tyaaa-aaaaa-aaaba-cai", tokenB: "mxzaz-hqaaa-aaaar-qaada-cai") {
@@ -54,41 +54,54 @@ const App: React.FC = () => {
       console.error('Error fetching ICP/USDC pool data:', error);
       throw error;
     }
-  };
+  }, []);
 
-  const updatePoolData = async () => {
+  const updatePoolData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const fetchedPoolData = await fetchICPUSDCPool();
       if (fetchedPoolData) {
         setPoolData(fetchedPoolData);
-        await backend.updatePoolData(fetchedPoolData);
+        const result = await backend.updatePoolData(fetchedPoolData);
+        if ('err' in result) {
+          throw new Error(result.err);
+        }
       }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'An unknown error occurred');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  };
+  }, [fetchICPUSDCPool]);
 
   useEffect(() => {
     updatePoolData();
     const interval = setInterval(updatePoolData, 30000); // Update every 30 seconds
     return () => clearInterval(interval);
-  }, []);
+  }, [updatePoolData]);
 
-  const calculatePrice = () => {
+  const calculatePrice = useCallback(() => {
     if (poolData && poolData.reserve0 > 0) {
       return poolData.reserve1 / poolData.reserve0;
     }
     return 0;
+  }, [poolData]);
+
+  const handleRetry = () => {
+    updatePoolData();
   };
 
   return (
     <div className="container">
       <h1 className="header">ICP/USDC Liquidity Pool</h1>
       {loading && <p className="text-center">Loading pool data...</p>}
-      {error && <p className="error-message">Error: {error}</p>}
+      {error && (
+        <div className="error-message">
+          <p>Error: {error}</p>
+          <button onClick={handleRetry} className="retry-button">Retry</button>
+        </div>
+      )}
       {poolData && (
         <div className="pool-data">
           <div className="pool-item">

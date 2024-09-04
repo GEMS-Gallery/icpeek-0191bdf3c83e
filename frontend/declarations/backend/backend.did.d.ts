@@ -10,10 +10,16 @@ export interface PoolData {
   'tokenB' : string,
   'kLast' : number,
 }
+export type Result = { 'ok' : null } |
+  { 'err' : string };
+export type Result_1 = { 'ok' : PoolData } |
+  { 'err' : string };
+export type Result_2 = { 'ok' : number } |
+  { 'err' : string };
 export interface _SERVICE {
-  'getCurrentPrice' : ActorMethod<[], number>,
-  'getPoolData' : ActorMethod<[], PoolData>,
-  'updatePoolData' : ActorMethod<[PoolData], undefined>,
+  'getCurrentPrice' : ActorMethod<[], Result_2>,
+  'getPoolData' : ActorMethod<[], Result_1>,
+  'updatePoolData' : ActorMethod<[PoolData], Result>,
 }
 export declare const idlFactory: IDL.InterfaceFactory;
 export declare const init: (args: { IDL: typeof IDL }) => IDL.Type[];

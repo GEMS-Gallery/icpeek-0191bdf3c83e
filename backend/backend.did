@@ -1,3 +1,18 @@
+type Result_2 = 
+ variant {
+   err: text;
+   ok: float64;
+ };
+type Result_1 = 
+ variant {
+   err: text;
+   ok: PoolData;
+ };
+type Result = 
+ variant {
+   err: text;
+   ok;
+ };
 type PoolData = 
  record {
    kLast: float64;
@@ -8,7 +23,7 @@ type PoolData =
    totalSupply: float64;
  };
 service : {
-  getCurrentPrice: () -> (float64) query;
-  getPoolData: () -> (PoolData) query;
-  updatePoolData: (PoolData) -> ();
+  getCurrentPrice: () -> (Result_2) query;
+  getPoolData: () -> (Result_1) query;
+  updatePoolData: (PoolData) -> (Result);
 }
