@@ -1,80 +1,109 @@
 import React, { useState, useEffect } from 'react';
 import { backend } from 'declarations/backend';
 
+const IC_DEX_URL = 'https://5sfsu-ciaaa-aaaad-qamka-cai.raw.ic0.app';
+
+type PoolData = {
+  tokenA: string;
+  tokenB: string;
+  reserve0: number;
+  reserve1: number;
+  totalSupply: number;
+  kLast: number;
+};
+
 const App: React.FC = () => {
-  const [errorMessage, setErrorMessage] = useState('');
-  const [errorMessages, setErrorMessages] = useState<string[]>([]);
-  const [errorCount, setErrorCount] = useState(0);
+  const [poolData, setPoolData] = useState<PoolData | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const fetchErrorMessages = async () => {
+  const fetchICPUSDCPool = async () => {
+    const query = `
+    query {
+      getPool(tokenA: "ryjl3-tyaaa-aaaaa-aaaba-cai", tokenB: "mxzaz-hqaaa-aaaar-qaada-cai") {
+        tokenA
+        tokenB
+        reserve0
+        reserve1
+        totalSupply
+        kLast
+      }
+    }`;
+
+    try {
+      const response = await fetch(`${IC_DEX_URL}/graphql`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.data.getPool;
+    } catch (error) {
+      console.error('Error fetching ICP/USDC pool data:', error);
+      return null;
+    }
+  };
+
+  const updatePoolData = async () => {
     setLoading(true);
     try {
-      const messages = await backend.getErrorMessages();
-      setErrorMessages(messages);
-      const count = await backend.getErrorCount();
-      setErrorCount(Number(count));
+      const fetchedPoolData = await fetchICPUSDCPool();
+      if (fetchedPoolData) {
+        setPoolData(fetchedPoolData);
+        await backend.updatePoolData(fetchedPoolData);
+      }
     } catch (error) {
-      console.error('Error fetching error messages:', error);
+      console.error('Error updating pool data:', error);
     }
     setLoading(false);
   };
 
   useEffect(() => {
-    fetchErrorMessages();
+    updatePoolData();
+    const interval = setInterval(updatePoolData, 30000); // Update every 30 seconds
+    return () => clearInterval(interval);
   }, []);
 
-  const handleAddError = async () => {
-    if (errorMessage.trim()) {
-      setLoading(true);
-      try {
-        await backend.addErrorMessage(errorMessage);
-        setErrorMessage('');
-        await fetchErrorMessages();
-      } catch (error) {
-        console.error('Error adding error message:', error);
-      }
-      setLoading(false);
+  const calculatePrice = () => {
+    if (poolData && poolData.reserve0 > 0) {
+      return poolData.reserve1 / poolData.reserve0;
     }
-  };
-
-  const handleClearErrors = async () => {
-    setLoading(true);
-    try {
-      await backend.clearErrorMessages();
-      await fetchErrorMessages();
-    } catch (error) {
-      console.error('Error clearing error messages:', error);
-    }
-    setLoading(false);
+    return 0;
   };
 
   return (
     <div className="container">
-      <h1 className="header">Error Logger</h1>
-      <div className="input-group">
-        <input
-          type="text"
-          value={errorMessage}
-          onChange={(e) => setErrorMessage(e.target.value)}
-          placeholder="Enter error message"
-          className="input"
-        />
-        <button onClick={handleAddError} className="button ml-2" disabled={loading}>
-          {loading ? 'Adding...' : 'Add Error'}
-        </button>
-      </div>
-      <button onClick={handleClearErrors} className="button" disabled={loading}>
-        {loading ? 'Clearing...' : 'Clear All Errors'}
-      </button>
-      <div className="error-list">
-        <p className="error-count">Total Errors: {errorCount}</p>
-        {errorMessages.map((msg, index) => (
-          <div key={index} className="error-item">
-            {msg}
+      <h1 className="header">ICP/USDC Liquidity Pool</h1>
+      {loading && <p className="text-center">Loading pool data...</p>}
+      {poolData && (
+        <div className="pool-data">
+          <div className="pool-item">
+            <span className="pool-label">ICP Reserve:</span>
+            <span className="pool-value">{poolData.reserve0.toFixed(4)}</span>
           </div>
-        ))}
-      </div>
+          <div className="pool-item">
+            <span className="pool-label">USDC Reserve:</span>
+            <span className="pool-value">{poolData.reserve1.toFixed(4)}</span>
+          </div>
+          <div className="pool-item">
+            <span className="pool-label">Total Supply:</span>
+            <span className="pool-value">{poolData.totalSupply.toFixed(4)}</span>
+          </div>
+          <div className="pool-item">
+            <span className="pool-label">K Last:</span>
+            <span className="pool-value">{poolData.kLast.toFixed(4)}</span>
+          </div>
+          <div className="price">
+            Current ICP price in USDC: ${calculatePrice().toFixed(4)}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

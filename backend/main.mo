@@ -1,34 +1,41 @@
-import Error "mo:base/Error";
-import Func "mo:base/Func";
-import Nat "mo:base/Nat";
-
-import Debug "mo:base/Debug";
-import Array "mo:base/Array";
 import Text "mo:base/Text";
 
+import Debug "mo:base/Debug";
+import Time "mo:base/Time";
+import Float "mo:base/Float";
+
 actor {
-  // Stable variable to store error messages
-  stable var errorMessages : [Text] = [];
-
-  // Function to add an error message
-  public func addErrorMessage(message : Text) : async () {
-    errorMessages := Array.append(errorMessages, [message]);
-    Debug.print("New error message added: " # message);
+  type PoolData = {
+    tokenA: Text;
+    tokenB: Text;
+    reserve0: Float;
+    reserve1: Float;
+    totalSupply: Float;
+    kLast: Float;
   };
 
-  // Function to get all error messages
-  public query func getErrorMessages() : async [Text] {
-    errorMessages
+  stable var currentPoolData: PoolData = {
+    tokenA = "";
+    tokenB = "";
+    reserve0 = 0;
+    reserve1 = 0;
+    totalSupply = 0;
+    kLast = 0;
   };
 
-  // Function to clear all error messages
-  public func clearErrorMessages() : async () {
-    errorMessages := [];
-    Debug.print("All error messages cleared");
+  public func updatePoolData(poolData: PoolData) : async () {
+    currentPoolData := poolData;
+    Debug.print("Pool data updated");
   };
 
-  // Function to get the count of error messages
-  public query func getErrorCount() : async Nat {
-    errorMessages.size()
+  public query func getPoolData() : async PoolData {
+    currentPoolData
+  };
+
+  public query func getCurrentPrice() : async Float {
+    if (currentPoolData.reserve0 == 0) {
+      return 0;
+    };
+    currentPoolData.reserve1 / currentPoolData.reserve0
   };
 }
