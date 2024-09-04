@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { backend } from 'declarations/backend';
+import { Actor, HttpAgent } from '@dfinity/agent';
+import { idlFactory } from '../declarations/backend/index';
+import { _SERVICE } from '../declarations/backend/backend.did';
 
-const IC_DEX_URL = 'https://5sfsu-ciaaa-aaaad-qamka-cai.raw.ic0.app';
+const IC_HOST = 'https://ic0.app';
+const CANISTER_ID = '5sfsu-ciaaa-aaaad-qamka-cai';
 
 type PoolData = {
   tokenA: string;
@@ -17,63 +20,47 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchICPUSDCPool = useCallback(async () => {
-    const query = `
-    query {
-      getPool(tokenA: "ryjl3-tyaaa-aaaaa-aaaba-cai", tokenB: "mxzaz-hqaaa-aaaar-qaada-cai") {
-        tokenA
-        tokenB
-        reserve0
-        reserve1
-        totalSupply
-        kLast
-      }
-    }`;
-
+  const createActor = useCallback(async () => {
     try {
-      const response = await fetch(`${IC_DEX_URL}/graphql`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({ query }),
+      const agent = new HttpAgent({ host: IC_HOST });
+      await agent.fetchRootKey();
+      return Actor.createActor<_SERVICE>(idlFactory, {
+        agent,
+        canisterId: CANISTER_ID,
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-      }
-
-      const data = await response.json();
-      if (data.errors) {
-        throw new Error(data.errors[0].message);
-      }
-      return data.data.getPool;
     } catch (error) {
-      console.error('Error fetching ICP/USDC pool data:', error);
-      throw error;
+      console.error('Error creating actor:', error);
+      throw new Error('Failed to initialize connection to the Internet Computer');
     }
   }, []);
+
+  const fetchPoolData = useCallback(async () => {
+    try {
+      const actor = await createActor();
+      const result = await actor.getPoolData();
+      if ('ok' in result) {
+        return result.ok;
+      } else {
+        throw new Error(result.err);
+      }
+    } catch (error) {
+      console.error('Error fetching pool data:', error);
+      throw error;
+    }
+  }, [createActor]);
 
   const updatePoolData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const fetchedPoolData = await fetchICPUSDCPool();
-      if (fetchedPoolData) {
-        setPoolData(fetchedPoolData);
-        const result = await backend.updatePoolData(fetchedPoolData);
-        if ('err' in result) {
-          throw new Error(result.err);
-        }
-      }
+      const fetchedPoolData = await fetchPoolData();
+      setPoolData(fetchedPoolData);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'An unknown error occurred');
     } finally {
       setLoading(false);
     }
-  }, [fetchICPUSDCPool]);
+  }, [fetchPoolData]);
 
   useEffect(() => {
     updatePoolData();
@@ -92,39 +79,60 @@ const App: React.FC = () => {
     updatePoolData();
   };
 
-  return (
-    <div className="container">
-      <h1 className="header">ICP/USDC Liquidity Pool</h1>
-      {loading && <p className="text-center">Loading pool data...</p>}
-      {error && (
+  if (error) {
+    return (
+      <div className="container">
+        <h1 className="header">ICP/USDC Liquidity Pool</h1>
         <div className="error-message">
           <p>Error: {error}</p>
           <button onClick={handleRetry} className="retry-button">Retry</button>
         </div>
-      )}
-      {poolData && (
-        <div className="pool-data">
-          <div className="pool-item">
-            <span className="pool-label">ICP Reserve:</span>
-            <span className="pool-value">{poolData.reserve0.toFixed(4)}</span>
-          </div>
-          <div className="pool-item">
-            <span className="pool-label">USDC Reserve:</span>
-            <span className="pool-value">{poolData.reserve1.toFixed(4)}</span>
-          </div>
-          <div className="pool-item">
-            <span className="pool-label">Total Supply:</span>
-            <span className="pool-value">{poolData.totalSupply.toFixed(4)}</span>
-          </div>
-          <div className="pool-item">
-            <span className="pool-label">K Last:</span>
-            <span className="pool-value">{poolData.kLast.toFixed(4)}</span>
-          </div>
-          <div className="price">
-            Current ICP price in USDC: ${calculatePrice().toFixed(4)}
-          </div>
+      </div>
+    );
+  }
+
+  if (loading && !poolData) {
+    return (
+      <div className="container">
+        <h1 className="header">ICP/USDC Liquidity Pool</h1>
+        <p className="text-center">Loading pool data...</p>
+      </div>
+    );
+  }
+
+  if (!poolData) {
+    return (
+      <div className="container">
+        <h1 className="header">ICP/USDC Liquidity Pool</h1>
+        <p className="fallback-message">No pool data available. Please try again later.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container">
+      <h1 className="header">ICP/USDC Liquidity Pool</h1>
+      <div className="pool-data">
+        <div className="pool-item">
+          <span className="pool-label">ICP Reserve:</span>
+          <span className="pool-value">{poolData.reserve0.toFixed(4)}</span>
         </div>
-      )}
+        <div className="pool-item">
+          <span className="pool-label">USDC Reserve:</span>
+          <span className="pool-value">{poolData.reserve1.toFixed(4)}</span>
+        </div>
+        <div className="pool-item">
+          <span className="pool-label">Total Supply:</span>
+          <span className="pool-value">{poolData.totalSupply.toFixed(4)}</span>
+        </div>
+        <div className="pool-item">
+          <span className="pool-label">K Last:</span>
+          <span className="pool-value">{poolData.kLast.toFixed(4)}</span>
+        </div>
+        <div className="price">
+          Current ICP price in USDC: ${calculatePrice().toFixed(4)}
+        </div>
+      </div>
     </div>
   );
 };

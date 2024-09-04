@@ -1,10 +1,10 @@
-import Result "mo:base/Result";
 import Text "mo:base/Text";
 
 import Debug "mo:base/Debug";
 import Time "mo:base/Time";
 import Float "mo:base/Float";
 import Error "mo:base/Error";
+import Result "mo:base/Result";
 
 actor {
   type PoolData = {
