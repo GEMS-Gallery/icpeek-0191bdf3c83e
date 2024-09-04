@@ -1,0 +1,6 @@
+service : {
+  addErrorMessage: (text) -> ();
+  clearErrorMessages: () -> ();
+  getErrorCount: () -> (nat) query;
+  getErrorMessages: () -> (vec text) query;
+}
